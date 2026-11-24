@@ -131,7 +131,7 @@
       "type": "string",
       "required": false,
       "title": "Add Namespaces",
-      "description": "Force additional namespaces (comma separated numbers)"
+      "description": "Force additional namespaces (comma separated numbers or names)"
     },
     "addContentModels": {
       "type": "string",
@@ -143,7 +143,7 @@
       "type": "string",
       "required": false,
       "title": "Only Namespaces",
-      "description": "Include only pages of provided namespaces (comma separated numbers)"
+      "description": "Include only pages of provided namespaces (comma separated numbers or names)"
     },
     "getCategories": {
       "type": "boolean",

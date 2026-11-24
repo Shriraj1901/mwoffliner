@@ -253,7 +253,8 @@ async function execute(argv: any) {
   const addNamespaces = _addNamespaces
     ? String(_addNamespaces)
         .split(',')
-        .map((a: string) => Number(a))
+        .map((a: string) => a.trim())
+        .filter((a: string) => a !== '')
     : []
 
   const addContentModels = _addContentModels
@@ -265,7 +266,8 @@ async function execute(argv: any) {
   const onlyNamespaces = _onlyNamespaces
     ? String(_onlyNamespaces)
         .split(',')
-        .map((a: string) => Number(a))
+        .map((a: string) => a.trim())
+        .filter((a: string) => a !== '')
     : []
 
   /* Get MediaWiki Info */

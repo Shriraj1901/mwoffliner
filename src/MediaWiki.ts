@@ -106,7 +106,7 @@ class MediaWiki {
   public getCategories: boolean
   public categoriesPageSize: number
   public namespaces: MWNamespaces = {}
-  public namespacesToMirror: string[] = []
+  public namespacesToMirror: number[] = []
   public apiCheckPageTitle: PageTitle
   public queryOpts: QueryOpts
   public urlDirector: BaseURLDirector
@@ -344,7 +344,43 @@ class MediaWiki {
     }
   }
 
-  public setNamespaces(json: SiteInfoQueryResponse, addNamespaces: number[], onlyNamespaces: number[]) {
+  /**
+   * Resolve namespace identifiers given by the user (numbers or names) to namespace numbers.
+   * A name can be the local name, the canonical name or an alias of the namespace (case insensitive,
+   * underscores and spaces being equivalent). Throws if a name does not match any namespace of the wiki.
+   */
+  private resolveNamespaceIds(json: SiteInfoQueryResponse, identifiers: (number | string)[], argName: string): Set<number> {
+    const normalize = (name: string) => name.trim().replace(/_/g, ' ').toLowerCase()
+    const byName = new Map<string, number>()
+    ;['namespaces', 'namespacealiases'].forEach((type) => {
+      Object.values(json[type] || {}).forEach((entry: any) => {
+        const names = type === 'namespaces' ? [entry.name, entry.canonical] : [entry.alias]
+        names.filter((n) => typeof n === 'string' && n.trim() !== '').forEach((n) => byName.set(normalize(n), entry.id))
+      })
+    })
+
+    const ids = new Set<number>()
+    identifiers.forEach((identifier) => {
+      if (typeof identifier === 'number') {
+        ids.add(identifier)
+      } else if (/^-?\d+$/.test(identifier.trim())) {
+        ids.add(Number(identifier.trim()))
+      } else {
+        const id = byName.get(normalize(identifier))
+        if (id === undefined) {
+          throw new Error(`Namespace "${identifier}" given in --${argName} is neither a namespace number nor a known namespace name or alias of this wiki`)
+        }
+        ids.add(id)
+      }
+    })
+    return ids
+  }
+
+  public setNamespaces(json: SiteInfoQueryResponse, addNamespaces: (number | string)[], onlyNamespaces: (number | string)[]) {
+    const addNamespaceIds = this.resolveNamespaceIds(json, addNamespaces, 'addNamespaces')
+    const onlyNamespaceIds = this.resolveNamespaceIds(json, onlyNamespaces, 'onlyNamespaces')
+    const namespacesToMirror = new Set<number>()
+
     ;['namespaces', 'namespacealiases'].forEach((type) => {
       const entries = json[type]
       Object.keys(entries).forEach((key) => {
@@ -366,19 +402,21 @@ class MediaWiki {
         }
 
         /* Is namespace to mirror */
-        if (onlyNamespaces.length) {
-          if (util.contains(onlyNamespaces, num)) {
-            this.namespacesToMirror.push(name)
+        if (onlyNamespaceIds.size) {
+          if (onlyNamespaceIds.has(num)) {
+            namespacesToMirror.add(num)
           }
         } else {
           const isContent = type === 'namespaces' ? !!entry.content : !!(entry.content !== undefined)
           const isBlacklisted = BLACKLISTED_NS.includes(name)
-          if ((isContent || util.contains(addNamespaces, num)) && !isBlacklisted) {
-            this.namespacesToMirror.push(name)
+          if ((isContent || addNamespaceIds.has(num)) && !isBlacklisted) {
+            namespacesToMirror.add(num)
           }
         }
       })
     })
+
+    this.namespacesToMirror = [...namespacesToMirror]
   }
 
   public extractPageTitleFromHref(href: any): PageTitle {
